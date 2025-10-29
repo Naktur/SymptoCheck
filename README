@@ -1,0 +1,4 @@
+App starting:
+python -m venv .venv
+.venv/Scripts/activate
+pip install django djangorestframework django-cors-headers python-dotenv google-generativeai

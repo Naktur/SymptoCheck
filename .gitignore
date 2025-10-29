@@ -1,0 +1,21 @@
+# Wirtualne środowisko
+venv/
+.venv/
+
+# Pliki tymczasowe Pythona
+__pycache__/
+*.py[cod]
+
+# Logi i cache
+*.log
+*.sqlite3
+
+# Dane wrażliwe
+.env
+*.key
+*.pem
+*.json
+
+# IDE
+.vscode/
+.idea/
