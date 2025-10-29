@@ -1,3 +1,75 @@
-from django.shortcuts import render
+import os
+import google.generativeai as genai
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, generics
+from django.conf import settings
+from .models import Analysis
+from .serializers import AnalysisSerializer
 
-# Create your views here.
+# Konfiguracja Gemini (raz)
+genai.configure(api_key=settings.GEMINI_API_KEY)
+
+PROMPT_TEMPLATE = """
+Jesteś inteligentnym asystentem medycznym.
+Na podstawie podanych objawów przedstaw listę maksymalnie 5 najbardziej prawdopodobnych diagnoz.
+Dla każdej choroby użyj poniższego formatu Markdown:
+
+**Nazwa choroby (np. Grypa, COVID-19, Zapalenie oskrzeli)**
+Krótki opis objawów w jednym zdaniu.
+Sugerowany specjalista: **nazwa lekarza**
+
+Objawy:
+\"\"\"
+{symptoms}
+\"\"\"
+
+Dodatkowo (na końcu) wypisz w formacie JSON obiekt "confidence" z polami:
+- "items": lista obiektów {{ "name": string, "prob": liczba 0-1 }}
+Zadbaj, by JSON był w pojedynczym bloku trój-znakowych backticków jako ```json ... ```.
+"""
+
+
+class DiagnoseView(APIView):
+    def post(self, request):
+        symptoms = (request.data.get("symptoms") or "").strip()
+        if not symptoms:
+            return Response({"error": "Brak pola 'symptoms'."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            model = genai.GenerativeModel(model_name="models/gemini-2.5-flash")
+            prompt = PROMPT_TEMPLATE.format(symptoms=symptoms)
+            result = model.generate_content(prompt)
+            text = result.text or ""
+
+            # Wyciągnij JSON z końca (opcjonalny parsing)
+            import json
+            import re
+            confidence = None
+            m = re.search(r"```json\s*(\{.*?\})\s*```", text, re.S)
+            if m:
+                try:
+                    confidence = json.loads(m.group(1))
+                except Exception:
+                    confidence = None
+
+            analysis = Analysis.objects.create(
+                symptoms=symptoms,
+                result_md=text,
+                confidence_json=confidence
+            )
+            return Response({
+                "id": analysis.id,
+                "result_md": analysis.result_md,
+                "confidence": analysis.confidence_json
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # <-- pokaże stacktrace w konsoli
+            return Response({"error": str(e)}, status=500)
+
+
+class AnalysisListView(generics.ListAPIView):
+    queryset = Analysis.objects.order_by("-created_at")[:50]
+    serializer_class = AnalysisSerializer
