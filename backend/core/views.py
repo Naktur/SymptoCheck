@@ -70,6 +70,55 @@ class DiagnoseView(APIView):
             return Response({"error": str(e)}, status=500)
 
 
-class AnalysisListView(generics.ListAPIView):
-    queryset = Analysis.objects.order_by("-created_at")[:50]
-    serializer_class = AnalysisSerializer
+class AnalysisListView(APIView):
+    def get(self, request):
+        analyses = Analysis.objects.order_by("-created_at")[:20]
+        serializer = AnalysisSerializer(analyses, many=True)
+        return Response(serializer.data)
+
+
+from django.http import JsonResponse
+
+def list_models(request):
+    import google.generativeai as genai
+    from django.conf import settings
+
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    models = [m.name for m in genai.list_models()]
+    return JsonResponse({"available_models": models})
+
+# --- CZAT ---
+class ChatView(APIView):
+    """
+    Czat medyczny AI — prowadzi rozmowę, ale bez utrzymywania stanu serwera.
+    Historia przekazywana w każdym żądaniu.
+    """
+
+    def post(self, request):
+        try:
+            message = request.data.get("message", "").strip()
+            history = request.data.get("history", [])
+
+            if not message:
+                return Response({"error": "Brak wiadomości."}, status=400)
+
+            # Zbuduj prompt kontekstowy
+            prompt = "Jesteś medycznym asystentem AI. Rozmawiasz z pacjentem o objawach.\n"
+            for h in history:
+                role = h.get("role", "user")
+                content = h.get("content", "")
+                if role == "user":
+                    prompt += f"\nPacjent: {content}"
+                else:
+                    prompt += f"\nAsystent: {content}"
+            prompt += f"\nPacjent: {message}\nAsystent:"
+
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            ai_text = response.text.strip()
+
+            return Response({"reply": ai_text})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
