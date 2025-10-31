@@ -12,9 +12,17 @@ export default function SymptomForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Kolor paska w zależności od poziomu pewności
+  const getBarColor = (p) => {
+    if (p > 0.7) return "from-green-400 to-green-600";
+    if (p > 0.4) return "from-yellow-400 to-yellow-600";
+    return "from-red-400 to-red-600";
+  };
+
   const handleAnalyze = async () => {
     setError("");
     setAnalysis("");
+    setConfidence(null);
 
     if (!symptoms.trim()) {
       setError("Wpisz swoje objawy.");
@@ -35,10 +43,27 @@ export default function SymptomForm() {
       }
 
       const data = await res.json();
-      setAnalysis(data.result_md || "");
-      setConfidence(data.confidence || null);
+      let text = data.result_md || "";
+
+      // --- WYCIĄGNIJ JSON Z TEKSTU ---
+      const jsonMatch = text.match(/```json\s*([\s\S]*?)```/);
+      let conf = null;
+
+      if (jsonMatch) {
+        try {
+          conf = JSON.parse(jsonMatch[1]);
+        } catch (err) {
+          console.warn("Nie udało się sparsować JSON:", err);
+        }
+        // usuń blok json z tekstu markdown
+        text = text.replace(/```json[\s\S]*?```/, "").trim();
+      }
+
+      setAnalysis(text);
+      setConfidence(conf?.items || conf?.confidence?.items || null);
     } catch (e) {
-      setError(e.message || "Wystąpił błąd podczas analizy. Spróbuj ponownie.");
+      console.error(e);
+      setError(e.message || "Wystąpił błąd podczas analizy.");
     } finally {
       setLoading(false);
     }
@@ -46,7 +71,7 @@ export default function SymptomForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white text-gray-900 p-6">
-      {/* Header */}
+      {/* HEADER */}
       <header className="max-w-4xl mx-auto text-center mb-10">
         <div className="flex justify-center items-center gap-2 mb-3">
           <Stethoscope className="w-8 h-8 text-blue-600" />
@@ -60,9 +85,9 @@ export default function SymptomForm() {
         </p>
       </header>
 
-      {/* Cards grid */}
+      {/* GRID Z KARTAMI */}
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
-        {/* Input card */}
+        {/* KARTA INPUT */}
         <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-100">
           <h2 className="text-2xl font-semibold mb-2 text-blue-700">
             Wprowadzanie objawów
@@ -94,50 +119,52 @@ export default function SymptomForm() {
           )}
         </div>
 
-        {/* AI result card */}
+        {/* KARTA WYNIKU */}
         <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-100">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-6 h-6 text-amber-500" />
             <h2 className="text-2xl font-semibold text-blue-700">Analiza AI</h2>
           </div>
 
-          {loading && (
-            <p className="text-gray-500 italic">Analizuję objawy…</p>
-          )}
+          {loading && <p className="text-gray-500 italic">Analizuję objawy…</p>}
 
           {!loading && analysis && (
             <>
-              <div className="prose max-w-none text-gray-800 mb-4">
+              <div className="prose max-w-none text-gray-800 mb-6">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {analysis}
                 </ReactMarkdown>
               </div>
 
-              {confidence?.items?.length > 0 && (
+              {/* --- ŁADNA SEKCJA PEWNOŚCI --- */}
+              {confidence?.length > 0 && (
                 <div className="mt-6 bg-blue-50 rounded-xl p-5 border border-blue-100 shadow-inner">
-                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                  <h3 className="font-semibold text-blue-800 mb-4 flex items-center gap-2">
                     🔍 Szacowane prawdopodobieństwo diagnozy
-                    </h3>
+                  </h3>
 
-                    <div className="space-y-3">
-                    {confidence.items.map((it, idx) => (
-                        <div key={idx}>
+                  <div className="space-y-3">
+                    {confidence.map((it, idx) => (
+                      <div key={idx}>
                         <div className="flex justify-between text-sm font-medium text-gray-700 mb-1">
-                            <span>{it.name}</span>
-                            <span className="text-blue-700">{(it.prob * 100).toFixed(0)}%</span>
+                          <span>{it.name}</span>
+                          <span className="text-blue-700">
+                            {(it.prob * 100).toFixed(0)}%
+                          </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                            <div
-                            className="bg-gradient-to-r from-blue-400 to-blue-600 h-2.5 rounded-full transition-all duration-700"
+                          <div
+                            className={`bg-gradient-to-r ${getBarColor(
+                              it.prob
+                            )} h-2.5 rounded-full transition-[width] duration-700 ease-out`}
                             style={{ width: `${it.prob * 100}%` }}
-                            ></div>
+                          ></div>
                         </div>
-                        </div>
+                      </div>
                     ))}
-                    </div>
+                  </div>
                 </div>
-                )}
-
+              )}
             </>
           )}
 
