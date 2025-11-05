@@ -14,7 +14,7 @@ __pycache__/
 .env
 *.key
 *.pem
-*.json
+
 
 # IDE
 .vscode/
