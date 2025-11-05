@@ -25,7 +25,7 @@ export default function SymptomForm() {
     setConfidence(null);
 
     if (!symptoms.trim()) {
-      setError("Wpisz swoje objawy.");
+      setError("Wpisz swoje objawy, aby rozpocząć analizę.");
       return;
     }
 
@@ -44,25 +44,19 @@ export default function SymptomForm() {
 
       const data = await res.json();
       let text = data.result_md || "";
-
-      // --- WYCIĄGNIJ JSON Z TEKSTU ---
       const jsonMatch = text.match(/```json\s*([\s\S]*?)```/);
       let conf = null;
 
       if (jsonMatch) {
         try {
           conf = JSON.parse(jsonMatch[1]);
-        } catch (err) {
-          console.warn("Nie udało się sparsować JSON:", err);
-        }
-        // usuń blok json z tekstu markdown
+        } catch {}
         text = text.replace(/```json[\s\S]*?```/, "").trim();
       }
 
       setAnalysis(text);
       setConfidence(conf?.items || conf?.confidence?.items || null);
     } catch (e) {
-      console.error(e);
       setError(e.message || "Wystąpił błąd podczas analizy.");
     } finally {
       setLoading(false);
@@ -70,122 +64,150 @@ export default function SymptomForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white text-gray-900 p-6">
+    <div className="min-h-screen flex flex-col justify-between bg-blue-50 text-gray-900">
       {/* HEADER */}
-      <header className="max-w-4xl mx-auto text-center mb-10">
+      <header className="text-center pt-8 pb-4 mb-10">
         <div className="flex justify-center items-center gap-2 mb-3">
           <Stethoscope className="w-8 h-8 text-blue-600" />
-          <h1 className="text-4xl font-bold text-blue-700">SymptoCheck</h1>
+          <h1 className="text-4xl font-bold text-black">SymptoCheck</h1>
         </div>
-        <p className="text-gray-600">
-          Opisz swoje objawy, a AI zasugeruje potencjalne diagnozy. <br />
+        <p className="text-gray-600 max-w-2xl mx-auto px-4">
+          Opisz swoje objawy, a sztuczna inteligencja zasugeruje potencjalne
+          diagnozy. <br />
           <span className="font-medium">
-            To narzędzie informacyjne, nie porada medyczna.
+            To narzędzie do uzyskania wstępnych informacji, a nie substytut
+            profesjonalnej porady medycznej.
           </span>
         </p>
       </header>
 
-      {/* GRID Z KARTAMI */}
-      <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
-        {/* KARTA INPUT */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-100">
-          <h2 className="text-2xl font-semibold mb-2 text-blue-700">
-            Wprowadzanie objawów
-          </h2>
-          <p className="text-gray-500 mb-4">
-            Podaj szczegóły (czas trwania, nasilenie, temperatura, inne choroby).
-          </p>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col justify-center items-center px-4 pb-10">
+        <div className="w-full max-w-7xl grid md:grid-cols-2 gap-8 mb-8">
+          {/* INPUT CARD */}
+          <div
+              className="bg-white shadow-md rounded-xl p-6 border border-gray-100 flex flex-col justify-between transition-all hover:shadow-lg">
+            <div>
+              <h2 className="text-2xl font-semibold mb-2 text-black">
+                Wprowadzanie objawów
+              </h2>
+              <p className="text-gray-500 mb-4 text-sm leading-relaxed">
+                Podaj szczegółowy opis tego, czego doświadczasz.
+              </p>
 
-          <textarea
-            rows={6}
-            value={symptoms}
-            onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="np. Uporczywy kaszel od 3 dni, gorączka 38.2, ból gardła, zmęczenie."
-            className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
+              <textarea
+                  rows={5}
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  placeholder="np. Mam uporczywy kaszel, lekką gorączkę i czuję się bardzo zmęczony."
+                  className="w-full border border-gray-300 rounded-lg p-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all resize-none"
+              />
+              <p className="text-gray-400 text-xs mt-1">
+                Im więcej szczegółów podasz, tym lepsza będzie analiza.
+              </p>
+            </div>
 
-          <button
-            onClick={handleAnalyze}
-            disabled={loading}
-            className="mt-4 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? "Analizuję..." : "Analizuj objawy"}
-          </button>
+            <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className="mt-5 w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition-all disabled:opacity-60"
+            >
+              {loading ? "Analizuję..." : "Analizuj objawy"}
+            </button>
 
-          {error && (
-            <p className="text-red-600 mt-3 text-sm bg-red-50 p-2 rounded-md border border-red-100">
-              {error}
-            </p>
-          )}
-        </div>
-
-        {/* KARTA WYNIKU */}
-        <div className="bg-white shadow-xl rounded-2xl p-6 border border-gray-100">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-6 h-6 text-amber-500" />
-            <h2 className="text-2xl font-semibold text-blue-700">Analiza AI</h2>
+            {error && (
+                <p className="text-red-600 mt-3 text-sm bg-red-50 p-2 rounded-md border border-red-200">
+                  {error}
+                </p>
+            )}
           </div>
 
-          {loading && <p className="text-gray-500 italic">Analizuję objawy…</p>}
+          {/* CONFIDENCE CARD */}
+          <div
+              className="bg-white shadow-md rounded-xl p-6 border border-gray-100 flex flex-col transition-all hover:shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-6 h-6 text-blue-500"/>
+              <h2 className="text-2xl font-semibold text-black">
+                Pewność diagnoz
+              </h2>
+            </div>
+            <p className="text-gray-500 text-sm mb-4">
+              Szacowane prawdopodobieństwo rozpoznania na podstawie analizy AI.
+            </p>
 
-          {!loading && analysis && (
-            <>
-              <div className="prose max-w-none text-gray-800 mb-6">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {analysis}
-                </ReactMarkdown>
-              </div>
-
-              {/* --- ŁADNA SEKCJA PEWNOŚCI --- */}
-              {confidence?.length > 0 && (
-                <div className="mt-6 bg-blue-50 rounded-xl p-5 border border-blue-100 shadow-inner">
-                  <h3 className="font-semibold text-blue-800 mb-4 flex items-center gap-2">
-                    🔍 Szacowane prawdopodobieństwo diagnozy
-                  </h3>
-
-                  <div className="space-y-3">
-                    {confidence.map((it, idx) => (
+            {confidence?.length > 0 ? (
+                <div className="space-y-3">
+                  {confidence.map((it, idx) => (
                       <div key={idx}>
                         <div className="flex justify-between text-sm font-medium text-gray-700 mb-1">
                           <span>{it.name}</span>
-                          <span className="text-blue-700">
-                            {(it.prob * 100).toFixed(0)}%
-                          </span>
+                          <span className="text-blue-700">{(it.prob * 100).toFixed(0)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                           <div
-                            className={`bg-gradient-to-r ${getBarColor(
-                              it.prob
-                            )} h-2.5 rounded-full transition-[width] duration-700 ease-out`}
-                            style={{ width: `${it.prob * 100}%` }}
+                              className={`bg-gradient-to-r ${getBarColor(
+                                  it.prob
+                              )} h-2.5 rounded-full transition-[width] duration-700 ease-out`}
+                              style={{width: `${it.prob * 100}%`}}
                           ></div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              )}
-            </>
+            ) : (
+                <p className="text-gray-400 italic text-center mt-6">
+                  Brak danych o pewności diagnoz.
+                </p>
+            )}
+          </div>
+        </div>
+
+        {/* ANALYSIS CARD (pełna szerokość) */}
+        <div
+            className="w-full max-w-7xl bg-white shadow-md rounded-xl p-6 border border-gray-100 transition-all hover:shadow-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-6 h-6 text-green-500"/>
+            <h2 className="text-2xl font-semibold text-black">Analiza AI</h2>
+          </div>
+          <p className="text-gray-500 text-sm mb-4">
+            Potencjalne schorzenia na podstawie Twoich objawów.
+          </p>
+
+          {loading && (
+              <div className="text-center text-gray-500 italic py-5">
+                Trwa analiza objawów...
+              </div>
+          )}
+
+          {!loading && analysis && (
+              <div className="prose max-w-none text-gray-800 leading-relaxed animate-fadeIn">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis}</ReactMarkdown>
+              </div>
           )}
 
           {!loading && !analysis && !error && (
-            <p className="text-gray-400 italic mt-4">
-              Twoja analiza pojawi się tutaj.
-            </p>
+              <p className="text-gray-400 italic mt-4 flex justify-center">
+                Twoja analiza pojawi się tutaj.
+              </p>
           )}
 
-          <div className="mt-6 text-sm text-gray-600 border-t pt-4">
-            <strong className="text-red-600">
-              To nie jest porada medyczna.
-            </strong>
-            <br />
-            W razie objawów alarmowych skontaktuj się z pogotowiem.
+          <div
+              className="mt-6 text-sm text-gray-700 rounded-md p-3"
+              style={{
+                backgroundColor: "#FFF5F5",
+                border: "1px solid #fbc2c4",
+                color: "#ff1818",
+              }}
+          >
+            <strong>To nie jest porada medyczna.</strong>{" "}
+            Skonsultuj się z lekarzem w celu uzyskania właściwej diagnozy.
           </div>
         </div>
-      </div>
+      </main>
 
-      <footer className="text-center text-gray-500 text-sm mt-10">
-        SymptoCheck © 2025
+      {/* FOOTER */}
+      <footer className="text-center text-gray-500 text-xs py-4">
+        SymptoCheck © 2025. Tylko w celach informacyjnych.
       </footer>
     </div>
   );
