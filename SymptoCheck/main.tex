@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper]{geometry}
+\usepackage{polski}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage[table,xcdraw]{xcolor}
+\definecolor{mygray}{gray}{0.5}
+\usepackage{graphicx}
+\usepackage{forest}
+\usepackage[T1]{fontenc}
+
+\tikzset{
+  block/.style={
+    rectangle,
+    draw=black,
+    fill=gray!10,
+    rounded corners,
+    text centered,
+    minimum width=3cm,
+    minimum height=1cm
+  },
+  arrow/.style={
+    thick,
+    ->,
+    >=Stealth
+  }
+}
+\usepackage{float}
+\usepackage{adjustbox}
+\usepackage[usestackEOL]{stackengine} 
+\usepackage{caption}
+\usetikzlibrary{shapes,arrows,chains}
+\usetikzlibrary{calc}
+\linespread{1.3}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{subcaption}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{longtable}
+\renewcommand{\arraystretch}{1.4}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, trees, mindmap}
+\usepackage{lscape}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{pdfpages}
+
+\geometry{a4paper, margin=1in}
+
+\lstset{
+  backgroundcolor=\color{white},   
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,                 
+  frame=single,                    
+  keywordstyle=\color{blue},       
+  language=Python,                 
+  numbers=left,                    
+  numberstyle=\tiny\color{mygray}, 
+  rulecolor=\color{black},         
+  tabsize=2,                       
+}
+
+\begin{document}
+
+% ============================ STRONA TYTUŁOWA ============================
+\begin{titlepage}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+\centering
+
+\includegraphics[scale=0.21]{pwr-logo.png}\\[2cm]
+
+\textsc{\Large Politechnika Wrocławska}\\[0.5cm]
+\textsc{\large Wydział Informatyki i Telekomunikacji}\\[0.5cm]
+\textsc{\large Kierunek: Informatyka techniczna}\\[0.5cm]
+\textsc{\large Specjalność: Systemy informatyki w medycynie}\\[2cm]
+
+\HRule \\[0.4cm]
+{\huge \bfseries SymptoCheck}\\[0.4cm]
+{\large Projekt aplikacji webowej wykorzystującej API Gemini do analizy objawów chorobowych}\\[0.4cm]
+\HRule \\[1cm]
+
+\begin{minipage}[t]{0.45\textwidth}
+\flushleft \large
+\emph{Autorzy:}\\
+Amelia \textsc{Draga} 272866 \\
+Artur \textsc{Gierlak} 272957
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.45\textwidth}
+\flushright \large
+\emph{Prowadzący:} \\
+dr hab. inż. Mariusz \textsc{Topolski}
+\end{minipage}
+
+\vfill
+\centering
+Wrocław, listopad 2025 r.
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\newpage
+
+% ============================ WSTĘP ============================
+\section{Wstęp}
+W ramach zajęć \textit{Projektowanie systemów informatyki medycznej} należało stworzyć dowolną aplikację o tematyce medycznej. Dodatkowym wymaganiem projektu było zaimplementowanie \textbf{API}, które umożliwia wymianę danych pomiędzy warstwami systemu lub integrację z zewnętrznym serwisem.
+
+
+\subsection{Cel projektu}
+Celem projektu \textbf{SymptoCheck} było stworzenie aplikacji internetowej o tematyce medycznej, wykorzystującej sztuczną inteligencję do wspomagania wstępnej diagnozy na podstawie objawów podanych przez użytkownika. Projekt miał na celu połączenie technologii webowych z dostępem do modelu językowego \textit{Gemini 2.5 Flash} udostępnianego przez API Google. Dzięki temu użytkownik może w prosty sposób uzyskać propozycję potencjalnych diagnoz, prowadzić rozmowę z wirtualnym asystentem oraz przeglądać historię wcześniejszych analiz.
+Aplikacja nie zastępuje profesjonalnej konsultacji lekarskiej – jej zadaniem jest jedynie wsparcie informacyjne poprzez analizę opisowych danych o objawach.
+
+\subsection{Opis systemu}
+System \textbf{SymptoCheck} został zaprojektowany jako dwuwarstwowa aplikacja webowa składająca się z:
+\begin{itemize}
+    \item \textbf{frontendu} zbudowanego w technologii \textbf{React (Vite, TailwindCSS)} , odpowiedzialnego za interakcję z użytkownikiem, prezentację wyników oraz czat z asystentem,
+    \item \textbf{backendu} opartego na frameworku \textbf{Django REST}, który odpowiada za przetwarzanie żądań, komunikację z \textbf{API modelu Gemini} oraz zapisywanie historii analiz w lokalnej bazie danych \textbf{SQLite}.
+\end{itemize}
+
+Głównym celem działania systemu jest umożliwienie użytkownikowi uzyskania wstępnej, poglądowej diagnozy na podstawie opisanych objawów. Dodatkowo aplikacja pozwala na rozmowę z~wirtualnym asystentem medycznym oraz przeglądanie historii wcześniejszych analiz, co zwiększa jej funkcjonalność i praktyczne zastosowanie.
+
+
+\subsection{Zakres projektu}
+W ramach projektu \textbf{SymptoCheck} udało się zrealizować wszystkie główne założenia funkcjonalne oraz techniczne systemu. Prace zostały podzielone na część frontendową i backendową, a następnie połączone w działającą całość komunikującą się poprzez \textbf{REST API}.
+Po stronie \textbf{backendu} zrealizowano:
+\begin{itemize}
+    \item konfigurację środowiska Django wraz z integracją \textit{Django REST Framework},
+    \item stworzenie modelu danych \texttt{Analysis}, który zapisuje historię wykonanych analiz (objawy, wynik, data),
+    \item implementację trzech głównych endpointów API:
+    \begin{itemize}
+        \item \texttt{/diagnose} – wysyła opis objawów do modelu \textit{Gemini 2.5 Flash} i zwraca analizę w formacie Markdown,
+        \item \texttt{/chat} – umożliwia prowadzenie rozmowy z modelem w kontekście medycznym,
+        \item \texttt{/analyses} – pozwala na pobranie zapisanej historii analiz,
+    \end{itemize}
+    \item integrację z \textbf{Gemini API} przy użyciu oficjalnej biblioteki \texttt{google-generativeai},
+    \item obsługę wyjątków i błędów API, takich jak brak połączenia lub nieprawidłowy klucz.
+\end{itemize}
+Po stronie \textbf{frontendu} wykonano:
+\begin{itemize}
+    \item zaprojektowanie i zaimplementowanie trzech głównych komponentów:
+    \begin{itemize}
+        \item \texttt{SymptomForm.jsx} – formularz, w którym użytkownik wpisuje objawy i otrzymuje wynik diagnozy,
+        \item \texttt{ChatAssistant.jsx} – moduł czatu, który pozwala prowadzić rozmowę z asystentem AI,
+        \item \texttt{HistoryList.jsx} – lista historii poprzednich analiz,
+    \end{itemize}
+    \item zastosowanie biblioteki \textit{React Markdown} do czytelnego wyświetlania wyników zwróconych przez model,
+    \item opracowanie prostego i intuicyjnego interfejsu użytkownika z wykorzystaniem \textit{TailwindCSS},
+    \item konfigurację komunikacji z backendem poprzez żądania HTTP metodą \texttt{POST} i \texttt{GET}.
+\end{itemize}
+
+
+W efekcie końcowym powstała w pełni działająca aplikacja, która umożliwia analizę objawów i uzyskanie możliwych diagnoz w oparciu o model AI, prowadzenie rozmowy z inteligentnym asystentem medycznym oraz zapisywanie i przeglądanie historii wcześniejszych analiz.
+Projekt został ukończony zgodnie z założeniami i spełnia wszystkie wymagania funkcjonalne określone na początku realizacji.
+
+
+% ============================ ARCHITEKTURA ============================
+\newpage
+\subsection{Architektura systemu}
+
+Aplikacja \textbf{SymptoCheck} została zaprojektowana w architekturze dwuwarstwowej, składającej się z części \textbf{frontendowej} oraz \textbf{backendowej}. Obie warstwy komunikują się ze sobą za pomocą interfejsu \textbf{REST API}, co zapewnia prostą i niezawodną wymianę danych między użytkownikiem a serwerem.
+
+\begin{itemize}
+    \item \textbf{Frontend} — odpowiada za interfejs użytkownika i obsługę logiki po stronie przeglądarki. Został stworzony przy użyciu technologii \textit{React.js}, w środowisku \textit{Vite}, z wykorzystaniem frameworka \textit{TailwindCSS} do stylizacji. Użytkownik wprowadza dane (objawy) w formularzu, a aplikacja przesyła je do serwera w formacie JSON. Wyniki analizy są następnie prezentowane w przejrzystej formie.
+    
+    \item \textbf{Backend} — pełni rolę warstwy serwerowej i został stworzony w \textit{Django REST Framework}. Jego zadaniem jest przyjmowanie żądań z frontendu, komunikacja z zewnętrznym API modelu \textit{Gemini 2.5 Flash} oraz zwracanie przetworzonych wyników do interfejsu użytkownika. Backend przechowuje również historię analiz w lokalnej bazie danych \textit{SQLite}.
+\end{itemize}
+
+Komunikacja pomiędzy frontendem a backendem odbywa się z wykorzystaniem metod \texttt{POST} i \texttt{GET}. Frontend przesyła zapytanie z opisem objawów na odpowiedni endpoint API, a backend wysyła dane do modelu \textit{Gemini 2.5 Flash}, który generuje analizę w formacie tekstowym (Markdown). Następnie wynik jest przekazywany z powrotem do użytkownika i zapisywany w historii.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2.2cm and 2.6cm, >=Stealth, thick]
+% --- first row ---
+\node (user) [draw, rounded corners, fill=blue!10, minimum width=2.8cm, minimum height=1cm, text centered] {Użytkownik};
+\node (frontend) [draw, rounded corners, fill=green!10, right=of user, minimum width=3cm, minimum height=1cm, text centered] {Frontend (React)};
+
+% --- second row ---
+\node (backend) [draw, rounded corners, fill=yellow!10, below=of frontend, minimum width=3cm, minimum height=1cm, text centered] {Backend (Django)};
+\node (api) [draw, rounded corners, fill=red!10, right=of backend, minimum width=3cm, minimum height=1cm, text centered] {Gemini API};
+
+% --- arrows ---
+\draw[->] (user) -- node[above]{1. Wprowadzenie objawów} (frontend);
+\draw[->] (frontend) -- node[right]{2. Zapytanie HTTP} (backend);
+\draw[->] (backend) -- node[above]{3. Żądanie do API Gemini} (api);
+\draw[<-] (backend) -- node[below]{4. Odpowiedź modelu} (api);
+\draw[<-] (frontend) -- node[left]{5. Wynik analizy} (backend);
+\draw[<-] (user) -- node[below]{6. Prezentacja wyników} (frontend);
+
+\end{tikzpicture}
+\caption{Schemat przepływu danych w architekturze systemu SymptoCheck.}
+\end{figure}
+
+
+
+Każda z warstw systemu działa niezależnie, co umożliwia łatwe modyfikacje oraz rozwijanie projektu w przyszłości. Na przykład możliwe jest wdrożenie backendu w chmurze, a frontendu jako aplikacji PWA (Progressive Web App). Taka struktura zapewnia także lepszą skalowalność i elastyczność w dalszym rozwoju systemu.
+
+Podsumowując, architektura \textbf{SymptoCheck} opiera się na prostym, ale skutecznym połączeniu Reacta po stronie klienta i Django REST po stronie serwera, z wykorzystaniem API \textit{Gemini 2.5 Flash} jako zewnętrznego źródła inteligentnej analizy.
+
+
+% ============================ OPIS FUNKCJONALNY ============================
+\newpage
+\section{Opis funkcjonalny aplikacji}
+\subsection{Główne moduły}
+\begin{itemize}
+    \item \textbf{Analiza objawów:} użytkownik wpisuje objawy, system generuje diagnozę z poziomem pewności.
+    \item \textbf{Czat:} konwersacja z AI o tematyce medycznej z zachowaniem kontekstu.
+    \item \textbf{Historia:} przechowywanie i podgląd wcześniejszych analiz.
+\end{itemize}
+
+\subsection{Zrzuty ekranu (TODO)}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{}
+\caption{TODO: Formularz analizy objawów}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{x.png}
+\caption{TODO: Widok czatu z AI}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{history.png}
+\caption{TODO: Historia analiz użytkownika}
+\end{figure}
+
+% ============================ TESTOWANIE ============================
+\newpage
+\section{Testowanie}
+\subsection{Testy backendu}
+Przykładowe testy jednostkowe z pliku \texttt{core/tests.py}:
+
+\begin{lstlisting}[language=Python]
+from rest_framework.test import APITestCase
+from django.urls import reverse
+
+class DiagnoseApiTests(APITestCase):
+    def test_empty_symptoms(self):
+        url = reverse('diagnose')
+        resp = self.client.post(url, {"symptoms": ""}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_valid_request(self):
+        url = reverse('diagnose')
+        resp = self.client.post(url, {"symptoms": "ból głowy i gorączka"}, format='json')
+        self.assertIn(resp.status_code, [200, 500])
+\end{lstlisting}
+
+\subsection{Testy integracyjne}
+\begin{itemize}
+    \item Połączenie frontend–backend przez REST API.
+    \item Walidacja poprawności zapisu historii analiz.
+    \item Weryfikacja błędów (brak objawów, brak klucza API).
+\end{itemize}
+
+\subsection{Uruchamianie testów}
+\begin{verbatim}
+cd backend
+python manage.py test core
+\end{verbatim}
+
+% ============================ PODSUMOWANIE ============================
+\newpage
+\section{Podsumowanie}
+Projekt \textbf{SymptoCheck} pokazuje praktyczne wykorzystanie modeli generatywnych w analizie objawów. Zastosowany model \textit{Gemini 2.5 Flash} umożliwia uzyskanie sensownych, czytelnych wyników i wspiera interaktywną komunikację z użytkownikiem.
+
+\textbf{Kierunki dalszego rozwoju:}
+\begin{itemize}
+    \item dodanie autoryzacji użytkowników i prywatnych historii analiz,
+    \item integracja z klasyfikacją ICD-10 lub SNOMED,
+    \item wizualizacja pewności diagnoz (wykres słupkowy),
+    \item wdrożenie konteneryzacji Docker Compose,
+    \item wdrożenie w chmurze (Render, Railway).
+\end{itemize}
+
+\section{Wyzwania i doświadczenia projektowe}
+\begin{itemize}
+    \item konfiguracja klucza API i uprawnień Google Gemini,
+    \item synchronizacja CORS pomiędzy frontendem i backendem,
+    \item walidacja danych i obsługa wyjątków SDK,
+    \item testowanie integracji React + Django.
+\end{itemize}
+
+\end{document}
