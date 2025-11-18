@@ -64,7 +64,11 @@
   numbers=left,                    
   numberstyle=\tiny\color{mygray}, 
   rulecolor=\color{black},         
-  tabsize=2,                       
+  tabsize=2,
+  extendedchars=true,
+  inputencoding=utf8,
+  literate={ą}{{\k{a}}}1 {ć}{{\'c}}1 {ę}{{\k{e}}}1 {ł}{{\l{}}}1 {ń}{{\'n}}1 {ó}{{\'o}}1 {ś}{{\'s}}1 {ź}{{\'z}}1 {ż}{{\.z}}1
+           {Ą}{{\k{A}}}1 {Ć}{{\'C}}1 {Ę}{{\k{E}}}1 {Ł}{{\L{}}}1 {Ń}{{\'N}}1 {Ó}{{\'O}}1 {Ś}{{\'S}}1 {Ź}{{\'Z}}1 {Ż}{{\.Z}}1
 }
 
 \begin{document}
@@ -242,21 +246,104 @@ Pola modelu:
     \item \texttt{confidence\_json} -- opcjonalne dane JSON zawierające prawdopodobieństwa poszczególnych diagnoz.
 \end{itemize}
 
+\subsubsection{Schemat bazy danych}
+Poniższy diagram przedstawia strukturę tabeli \texttt{Analysis} w bazie SQLite:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.5cm]
+  \node[draw, rectangle, minimum width=6cm, minimum height=0.8cm, fill=blue!20] (header) {\textbf{core\_analysis}};
+  
+  \node[draw, rectangle, minimum width=6cm, anchor=north] (id) at (header.south) {
+    \begin{tabular}{l l}
+    \texttt{id} & INTEGER PRIMARY KEY
+    \end{tabular}
+  };
+  
+  \node[draw, rectangle, minimum width=6cm, anchor=north] (created) at (id.south) {
+    \begin{tabular}{l l}
+    \texttt{created\_at} & DATETIME NOT NULL
+    \end{tabular}
+  };
+  
+  \node[draw, rectangle, minimum width=6cm, anchor=north] (symptoms) at (created.south) {
+    \begin{tabular}{l l}
+    \texttt{symptoms} & TEXT NOT NULL
+    \end{tabular}
+  };
+  
+  \node[draw, rectangle, minimum width=6cm, anchor=north] (result) at (symptoms.south) {
+    \begin{tabular}{l l}
+    \texttt{result\_md} & TEXT NOT NULL
+    \end{tabular}
+  };
+  
+  \node[draw, rectangle, minimum width=6cm, anchor=north] (confidence) at (result.south) {
+    \begin{tabular}{l l}
+    \texttt{confidence\_json} & JSON NULL
+    \end{tabular}
+  };
+\end{tikzpicture}
+\caption{Schemat tabeli \texttt{core\_analysis} w bazie danych SQLite}
+\end{figure}
+
+Django automatycznie tworzy tabelę na podstawie modelu podczas wykonania migracji (\texttt{python manage.py migrate}). Nazwa tabeli ma prefiks \texttt{core\_} pochodzący od nazwy aplikacji Django.
+
+\subsection{Szczegółowy przepływ danych dla analizy objawów}
+Poniższy diagram sekwencji ilustruje dokładny przepływ danych podczas wykonywania analizy objawów:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.5cm and 2cm]
+  % Actors
+  \node[draw, rectangle, fill=blue!10, minimum width=2cm, minimum height=0.8cm] (user) {Użytkownik};
+  \node[draw, rectangle, fill=green!10, right=of user, minimum width=2cm, minimum height=0.8cm] (react) {React Frontend};
+  \node[draw, rectangle, fill=yellow!10, right=of react, minimum width=2cm, minimum height=0.8cm] (django) {Django Backend};
+  \node[draw, rectangle, fill=red!10, right=of django, minimum width=2cm, minimum height=0.8cm] (gemini) {Gemini API};
+  \node[draw, rectangle, fill=gray!10, below=of django, yshift=-3cm, minimum width=2cm, minimum height=0.8cm] (db) {SQLite DB};
+  
+  % Vertical lines
+  \draw[dashed] (user.south) -- ++(0,-9);
+  \draw[dashed] (react.south) -- ++(0,-9);
+  \draw[dashed] (django.south) -- ++(0,-9);
+  \draw[dashed] (gemini.south) -- ++(0,-9);
+  \draw[dashed] (db.north) -- ++(0,3);
+  
+  % Interactions
+  \draw[->, thick] ([yshift=-0.5cm]user.south) -- ([yshift=-0.5cm]react.south) node[midway, above, font=\scriptsize] {1. Wpisuje objawy};
+  
+  \draw[->, thick] ([yshift=-1.2cm]react.south) -- ([yshift=-1.2cm]django.south) node[midway, above, font=\scriptsize] {2. POST /diagnose};
+  
+  \draw[->, thick] ([yshift=-2cm]django.south) -- ([yshift=-2cm]gemini.south) node[midway, above, font=\scriptsize] {3. generate\_content()};
+  
+  \draw[<-, thick] ([yshift=-2.7cm]django.south) -- ([yshift=-2.7cm]gemini.south) node[midway, above, font=\scriptsize] {4. Markdown + JSON};
+  
+  \draw[->, thick] ([yshift=-3.5cm]django.south) -- ([yshift=-0.3cm]db.north) node[midway, right, font=\scriptsize] {5. Zapis do DB};
+  
+  \draw[<-, thick] ([yshift=-4.2cm]django.south) -- ([yshift=-0.8cm]db.north) node[midway, right, font=\scriptsize] {6. analysis.id};
+  
+  \draw[<-, thick] ([yshift=-5cm]react.south) -- ([yshift=-5cm]django.south) node[midway, above, font=\scriptsize] {7. JSON response};
+  
+  \draw[<-, thick] ([yshift=-5.7cm]user.south) -- ([yshift=-5.7cm]react.south) node[midway, above, font=\scriptsize] {8. Wyświetla wyniki};
+\end{tikzpicture}
+\caption{Diagram sekwencji dla procesu analizy objawów}
+\end{figure}
+
 \subsection{Endpointy API}
 Backend udostępnia cztery endpointy RESTful:
 
 \subsubsection{POST /api/diagnose/}
 Endpoint odpowiedzialny za wykonanie analizy objawów.
 
-\textbf{Żądanie:}
-\begin{lstlisting}[language=json]
+\textbf{Żądanie (JSON):}
+\begin{verbatim}
 {
   "symptoms": "ból głowy, gorączka, kaszel"
 }
-\end{lstlisting}
+\end{verbatim}
 
-\textbf{Odpowiedź:}
-\begin{lstlisting}[language=json]
+\textbf{Odpowiedź (JSON):}
+\begin{verbatim}
 {
   "id": 1,
   "result_md": "**Grypa**\nInfekcja wirusowa...",
@@ -267,7 +354,7 @@ Endpoint odpowiedzialny za wykonanie analizy objawów.
     ]
   }
 }
-\end{lstlisting}
+\end{verbatim}
 
 Implementacja widoku wykorzystuje model \texttt{GenerativeModel} z biblioteki \texttt{google-generativeai}:
 
@@ -287,7 +374,7 @@ class DiagnoseView(APIView):
             result = model.generate_content(prompt)
             text = result.text or ""
             
-            # Parsowanie JSON z prawdopodobieństwami
+            # Parsowanie JSON z prawdopodobienstwami
             confidence = extract_confidence_json(text)
             
             analysis = Analysis.objects.create(
@@ -308,8 +395,8 @@ class DiagnoseView(APIView):
 \subsubsection{GET /api/analyses/}
 Zwraca listę ostatnich 20 analiz użytkownika.
 
-\textbf{Odpowiedź:}
-\begin{lstlisting}[language=json]
+\textbf{Odpowiedź (JSON):}
+\begin{verbatim}
 [
   {
     "id": 1,
@@ -318,13 +405,13 @@ Zwraca listę ostatnich 20 analiz użytkownika.
     "result_md": "..."
   }
 ]
-\end{lstlisting}
+\end{verbatim}
 
 \subsubsection{POST /api/chat/}
 Umożliwia prowadzenie rozmowy z asystentem AI.
 
-\textbf{Żądanie:}
-\begin{lstlisting}[language=json]
+\textbf{Żądanie (JSON):}
+\begin{verbatim}
 {
   "message": "Czy powinienem się martwić?",
   "history": [
@@ -332,14 +419,14 @@ Umożliwia prowadzenie rozmowy z asystentem AI.
     {"role": "assistant", "content": "Może to być..."}
   ]
 }
-\end{lstlisting}
+\end{verbatim}
 
-\textbf{Odpowiedź:}
-\begin{lstlisting}[language=json]
+\textbf{Odpowiedź (JSON):}
+\begin{verbatim}
 {
   "reply": "Jeśli objawy utrzymują się, warto skonsultować..."
 }
-\end{lstlisting}
+\end{verbatim}
 
 \subsubsection{GET /api/models/}
 Endpoint testowy zwracający listę dostępnych modeli w API Gemini.
@@ -349,19 +436,19 @@ Kluczowym elementem działania systemu jest odpowiednio skonstruowany prompt dla
 
 \begin{lstlisting}[language=Python, basicstyle=\ttfamily\scriptsize]
 PROMPT_TEMPLATE = """
-Jesteś inteligentnym asystentem medycznym.
-Na podstawie podanych objawów przedstaw listę maksymalnie 5 
+Jestes inteligentnym asystentem medycznym.
+Na podstawie podanych objawow przedstaw liste maksymalnie 5 
 najbardziej prawdopodobnych diagnoz.
 
-Dla każdej choroby użyj poniższego formatu Markdown:
+Dla kazdej choroby uzyj ponizszego formatu Markdown:
 **Nazwa choroby (np. Grypa, COVID-19)**
-Krótki opis objawów w jednym zdaniu.
+Krotki opis objawow w jednym zdaniu.
 Sugerowany specjalista: **nazwa lekarza**
 
 Objawy: {symptoms}
 
 Dodatkowo wypisz w formacie JSON obiekt "confidence" z polami:
-- "items": lista obiektów {{"name": string, "prob": liczba 0-1}}
+- "items": lista obiektow {{"name": string, "prob": liczba 0-1}}
 """
 \end{lstlisting}
 
@@ -382,6 +469,38 @@ Backend implementuje podstawową obsługę wyjątków:
 
 \subsection{Architektura komponentowa}
 Frontend został zbudowany w architekturze komponentowej React. Główne komponenty:
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  component/.style={rectangle, draw, rounded corners, fill=blue!10, text width=3.5cm, text centered, minimum height=1cm},
+  subcomponent/.style={rectangle, draw, rounded corners, fill=green!10, text width=3cm, text centered, minimum height=0.8cm},
+  node distance=1.2cm
+]
+  % Root component
+  \node[component, fill=orange!20] (app) {\textbf{App.jsx}\\Główny komponent};
+  
+  % Main components
+  \node[component, below left=of app, xshift=-2cm] (symptom) {\textbf{SymptomForm.jsx}\\Formularz analizy};
+  \node[component, below=of app] (history) {\textbf{HistoryList.jsx}\\Historia analiz};
+  \node[component, below right=of app, xshift=2cm] (chat) {\textbf{ChatAssistant.jsx}\\Czat z AI};
+  
+  % Sub-components
+  \node[subcomponent, below=of symptom] (markdown1) {ReactMarkdown};
+  \node[subcomponent, below=of history] (markdown2) {ReactMarkdown};
+  \node[subcomponent, below=of chat] (markdown3) {ReactMarkdown};
+  
+  % Arrows
+  \draw[->, thick] (app) -- (symptom) node[midway, left, font=\scriptsize] {tab="form"};
+  \draw[->, thick] (app) -- (history) node[midway, left, font=\scriptsize] {tab="history"};
+  \draw[->, thick] (app) -- (chat) node[midway, right, font=\scriptsize] {tab="chat"};
+  
+  \draw[->, dashed] (symptom) -- (markdown1);
+  \draw[->, dashed] (history) -- (markdown2);
+  \draw[->, dashed] (chat) -- (markdown3);
+\end{tikzpicture}
+\caption{Architektura komponentowa aplikacji React}
+\end{figure}
 
 \subsubsection{App.jsx}
 Główny komponent aplikacji odpowiedzialny za:
@@ -404,7 +523,7 @@ Komponent formularza analizy objawów. Implementacja obejmuje:
 \end{itemize}
 
 Fragment kodu odpowiedzialny za wywołanie API:
-\begin{lstlisting}[language=JavaScript, basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\scriptsize]
 const handleAnalyze = async () => {
   setLoading(true);
   try {
@@ -478,7 +597,7 @@ Adres bazowy API jest konfigurowany przez zmienną środowiskową \texttt{VITE\_
 \subsection{Renderowanie Markdown}
 Odpowiedzi z API są w formacie Markdown, co wymaga konwersji na HTML. Do tego celu używana jest biblioteka \texttt{react-markdown} z pluginem \texttt{remark-gfm} (GitHub Flavored Markdown):
 
-\begin{lstlisting}[language=JavaScript]
+\begin{lstlisting}[language=Python]
 <ReactMarkdown remarkPlugins={[remarkGfm]}>
   {analysis}
 </ReactMarkdown>
@@ -838,7 +957,7 @@ REST_FRAMEWORK = {
 
 \subsubsection{Frontend: vite.config.js}
 Konfiguracja narzędzia budowania:
-\begin{lstlisting}[language=JavaScript]
+\begin{lstlisting}[language=Python]
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -893,7 +1012,7 @@ Generuje zoptymalizowane pliki statyczne w folderze \texttt{dist/}.
 
 \subsection{Konteneryzacja (Docker)}
 Przykładowa konfiguracja \texttt{docker-compose.yml}:
-\begin{lstlisting}[language=yaml, basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\scriptsize]
 version: '3.8'
 services:
   backend:
@@ -1224,9 +1343,6 @@ Największą satysfakcję sprawiła możliwość stworzenia działającego syste
     \item \textbf{HL7 FHIR} -- Standard wymiany danych medycznych
 \end{enumerate}
 
-    \item \textbf{HL7 FHIR} -- Standard wymiany danych medycznych
-\end{enumerate}
-
 % ============================ ZAŁĄCZNIK ============================
 \newpage
 \section*{Załącznik A: Przykładowe wyniki działania systemu}
@@ -1312,7 +1428,7 @@ urlpatterns = [
 \end{lstlisting}
 
 \subsection*{B.4. Komponent React (frontend/src/App.jsx - fragment)}
-\begin{lstlisting}[language=JavaScript, basicstyle=\ttfamily\scriptsize]
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\scriptsize]
 import React, { useState } from "react";
 import SymptomForm from "./SymptomForm";
 import HistoryList from "./HistoryList";
